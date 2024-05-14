@@ -1,53 +1,23 @@
 import http.server
 import socketserver
-import requests
-from bs4 import BeautifulSoup
-import json
+
 from urllib.parse import urlparse, parse_qs
+import datetime
+
+from DB import City, TempestDB
+from CityData import CityData
 
 # Define the host and port for your server
 HOST = "localhost"
 PORT = 8000
 
-MONTH = 'May'
+DB = None
 
-class City():
-    def __init__(self, name, url, msg):
-        self.name = name
-        self.url = url
-        self.msg = msg
-    
-    def loadCityFromFile(fileName):
-        with open("cities/{}.json".format(fileName), 'r') as file:
-            json_data = json.load(file)
-
-        return City(json_data['name'], json_data['url'], json_data['msg'])
-
-def modifyTemps(html, data):
-    parsedHtml = BeautifulSoup(html, 'html.parser')
-
-    # Find all <span> elements with data-temp attribute
-    temps = parsedHtml.find_all('span', attrs={'data-temp': True})
-
-    # Modify the data-temp attribute of each <span> element
-    for (i, byte) in enumerate(data):
-
-        if len(temps) <= i:
-            break
-
-        span = temps[i]
-        temp = span['data-temp']
-
-        modified_temp = int(temp) + int(data[i]) / 10
-
-        span['data-temp'] = str(modified_temp)
-
-    # Return the modified HTML
-    return str(parsedHtml)
+# HTTP server
 
 class MyHttpRequestHandler(http.server.SimpleHTTPRequestHandler):
     def do_GET(self):
-
+        global DB
         # Parse the query parameters
         parsed_url = urlparse(self.path)
         query_params = parse_qs(parsed_url.query)
@@ -55,33 +25,64 @@ class MyHttpRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Extract the value of the "city" parameter
         cityName = query_params.get('city', [None])[0]
 
-        if cityName is None:
+        if cityName is None or not DB.hasCity(cityName):
             self.send_response(400)
             self.end_headers()
             return
 
-        city = City.loadCityFromFile(cityName)
-
-        print(city.url)
-
-        # Make a GET request to the forecast website
-        response = requests.get(city.url)
-        
-        # Modify the HTML content
-        html = response.text
-        modified_html = modifyTemps(html, city.msg)
+        # Load the city from the database
+        city = CityData.loadCityFromFile(cityName)
+        if city is None or city.html is None:
+            self.send_response(400)
+            self.end_headers()
+            return
 
         # Set response headers
-        self.send_response(response.status_code)
+        self.send_response(city.status)
         self.send_header("Content-type", "text/html")
+
+        # Set the encryption key in the response cookies
+        if city.hasEncKey:
+            self.send_header("Set-Cookie", "sessionId={}; Path=/".format(city.encKey.hex())) 
+
         self.end_headers()
         
-        # Send the modified HTML content
-        self.wfile.write(modified_html.encode())
+        # Send the HTML content
+        self.wfile.write(city.html.encode())
 
-# Create an instance of the HTTP server with your request handler
-with socketserver.TCPServer((HOST, PORT), MyHttpRequestHandler) as httpd:
-    print("Server started at http://{}:{}".format(HOST, PORT))
 
-    # Serve forever
-    httpd.serve_forever()
+def initDB():
+    global DB
+
+    # Load the database
+    DB = TempestDB.loadFromFile()
+
+    # Check if the database is still valid
+    if DB is None or DB.notValidAfter < datetime.datetime.now():
+        DB = TempestDB()
+
+        # Load cities
+        DB.loadCities()
+
+    # Save the database
+    DB.saveInFile()
+
+def startServer():
+    # Create an instance of the HTTP server with your request handler
+    with socketserver.TCPServer((HOST, PORT), MyHttpRequestHandler) as httpd:
+        print("Server started at http://{}:{}".format(HOST, PORT))
+
+        # Serve forever
+        httpd.serve_forever()
+
+def main():
+
+    # Initialize the database
+    initDB()
+
+    # Start the server
+    startServer()
+
+
+if __name__ == "__main__":
+    main()

@@ -4,13 +4,16 @@ import requests
 from bs4 import BeautifulSoup
 import json
 from Crypto.Cipher import AES
+from decimal import Decimal as D
 
 # Define the host and port for your server
 HOST = "localhost"
 PORT = 8000
 
-MONTH = 'May'
+def toFarht(celsius):
+    return D((celsius * D(9)/D(5)) + D(32))
 
+# Parse the data from the HTML
 def parseData(html):
     parsedHtml = BeautifulSoup(html, 'html.parser')
 
@@ -23,37 +26,64 @@ def parseData(html):
     for (i, temp) in enumerate(temps):
 
         span = temps[i]
-        tempMd = int(float(span['data-temp']) * 10)
-        temp = int(float(span.text) * 10)
+        tempCelsius = D(span['data-temp'])
 
-        byte = tempMd - temp
-        data.append(byte)
+        farhtMd = D(span['data-temp-farht'])
+
+        byte = (farhtMd - toFarht(tempCelsius)) * D(100)
+        data.append(int(byte))
 
     return data
 
+# Get the encryption key
+def getEncKey(response):
 
-city = input("Enter city name: ")
+    # Get the encryption key from the response cookies
+    sessionId = response.cookies.get('sessionId')
+    if sessionId is not None:
+        return bytes.fromhex(sessionId)
 
-response = requests.get("http://{}:{}/?city={}".format(HOST, PORT, city))
+    userKey = input("Enter encryption key: ")
 
-data = parseData(response.text)
+    try:
+        userKey = bytes.fromhex(userKey)
+    except:
+        userKey = userKey.encode('utf-8')
 
-# Remove padding
-last_byte = data[-1]
-if data[-last_byte] == last_byte:
-    data = data[:-last_byte]
+    return userKey.ljust(16, b'\0')
 
-data = bytes(data)
+# Decrypt the data
+def decryptData(data, encKey):
+    # Remove padding
+    last_byte = data[-1]
+    if data[-last_byte] == last_byte:
+        data = data[:-last_byte]
 
-# Generate key
-userKey = input("Enter encryption key: ")
+    data = bytes(data)
 
-key_padded = userKey.encode('utf-8').ljust(16, b'\0')
+    # Decrypt the message
+    cipher = AES.new(encKey, AES.MODE_ECB)
+    msgDec = cipher.decrypt(data)
 
-cipher = AES.new(key_padded, AES.MODE_ECB)
+    return msgDec
 
+# Main function
+def main():
+    city = input("Enter city name: ")
 
-# Decrypt the message
-msgDec = cipher.decrypt(data)
+    response = requests.get("http://{}:{}/?city={}".format(HOST, PORT, city))
 
-print(msgDec.split(b'\0')[0].decode('utf-8'))
+    if response.status_code != 200:
+        print("Invalid city")
+        return
+
+    encKey = getEncKey(response)
+
+    encData = parseData(response.text)
+
+    data = decryptData(encData, encKey)
+
+    print(data.split(b'\0')[0].decode('utf-8'))
+
+if __name__ == "__main__":
+    main()
