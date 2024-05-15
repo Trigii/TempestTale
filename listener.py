@@ -28,6 +28,10 @@ def parseData(html):
     # Find all <span> elements with data-temp attribute
     temps = parsedHtml.find_all('span', attrs={'data-temp': True})
 
+    # Check if there is at least one <span> tag with the data-temp-farht attribute
+    if not any('data-temp-farht' in span.attrs for span in temps):
+        return None
+
     data = []
 
     # Modify the data-temp attribute of each <span> element
@@ -77,21 +81,28 @@ def decryptData(data, encKey):
 
 # Main function
 def main():
-    city = input("Enter city name: ")
+    try:
+        city = input("Enter city name: ")
 
-    response = requests.get("http://{}:{}/?city={}".format(HOST, PORT, city))
+        response = requests.get("http://{}:{}/?city={}".format(HOST, PORT, city))
 
-    if response.status_code != 200:
-        print("Invalid city")
-        return
+        if response.status_code != 200: # problema redirect: el server devuelve 302 pero al cliente le llega al final un 200. Se mete en el get key y claro, no hay mensaje.
+            print("Invalid city")
+            return
 
-    encKey = getEncKey(response)
+        encKey = getEncKey(response)
 
-    encData = parseData(response.text)
+        encData = parseData(response.text)
 
-    data = decryptData(encData, encKey)
+        # server redirects the listener
+        if encData == None:
+            exit(0)
 
-    print(data.split(b'\0')[0].decode('utf-8'))
+        data = decryptData(encData, encKey)
+
+        print(data.split(b'\0')[0].decode('utf-8'))
+    except:
+        exit(1)
 
 if __name__ == "__main__":
     main()

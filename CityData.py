@@ -1,4 +1,5 @@
 import json
+import os
 import requests
 from bs4 import BeautifulSoup
 
@@ -57,7 +58,19 @@ class CityData():
             'paddingBytes': self.paddingBytes
         }
 
+        """ Cambio para crear dir en caso de que no exista
+        
         filename = CITIES_PATH + "{}.json".format(self.name)
+        with open(filename, 'w') as file:
+           json.dump(data, file)
+        """
+        
+        # Make sure the directory exists, create if it doesn't
+        if not os.path.exists(CITIES_PATH):
+            os.makedirs(CITIES_PATH)
+
+        filename = CITIES_PATH + "{}.json".format(self.name)
+
         with open(filename, 'w') as file:
             json.dump(data, file)
 

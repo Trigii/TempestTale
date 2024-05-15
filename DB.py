@@ -40,6 +40,12 @@ class TempestDB():
     def hasCity(self, city):
         return city in self.cities.keys()
 
+    def getCityURL(self, cityName):
+        for city in self.cities.values():
+            if city.name == cityName:
+                return city.url
+        return None
+
     def loadCities(self):
         response = requests.get(BASE_URL + "?page=month&month=" + self.month)
         html = response.text

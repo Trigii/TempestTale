@@ -25,15 +25,22 @@ class MyHttpRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Extract the value of the "city" parameter
         cityName = query_params.get('city', [None])[0]
 
+        # City doesent exist
         if cityName is None or not DB.hasCity(cityName):
-            self.send_response(400)
-            self.end_headers()
+            #self.send_response(404)
+            #self.end_headers()
+            self.send_error(404, "City not found")
             return
 
         # Load the city from the database
         city = CityData.loadCityFromFile(cityName)
+
+        # Redirect in case there is no existing message
         if city is None or city.html is None:
-            self.send_response(400)
+            cityURL = DB.getCityURL(cityName=cityName)
+            self.send_response(302)
+            # print(cityURL)
+            self.send_header('Location', cityURL)
             self.end_headers()
             return
 
