@@ -64,8 +64,8 @@ def initDB():
         # Load cities
         DB.loadCities()
 
-    # Save the database
-    DB.saveInFile()
+        # Save the database
+        DB.saveInFile()
 
 def startServer():
     # Create an instance of the HTTP server with your request handler

@@ -13,6 +13,14 @@ PORT = 8000
 def toFarht(celsius):
     return D((celsius * D(9)/D(5)) + D(32))
 
+def is_hexadecimal(s):
+    try:
+        bytes.fromhex(s)
+        return True
+    except ValueError:
+        return False
+
+
 # Parse the data from the HTML
 def parseData(html):
     parsedHtml = BeautifulSoup(html, 'html.parser')
@@ -45,9 +53,9 @@ def getEncKey(response):
 
     userKey = input("Enter encryption key: ")
 
-    try:
+    if is_hexadecimal(userKey) and len(userKey) == 32:
         userKey = bytes.fromhex(userKey)
-    except:
+    else:
         userKey = userKey.encode('utf-8')
 
     return userKey.ljust(16, b'\0')

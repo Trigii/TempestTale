@@ -70,7 +70,7 @@ class TempestDB():
 
             tempestDb = TempestDB()
             tempestDb.notValidAfter = datetime.fromisoformat(data['notValidAfter'])
-            tempestDb.numCities = data['numCities']
+            tempestDb.numCities = 0
             tempestDb.citiesInUse = data['citiesInUse']
 
             for city_data in data['cities']:
