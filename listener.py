@@ -86,9 +86,9 @@ def main():
 
         response = requests.get("http://{}:{}/?city={}".format(HOST, PORT, city))
 
-        if response.status_code != 200: # problema redirect: el server devuelve 302 pero al cliente le llega al final un 200. Se mete en el get key y claro, no hay mensaje.
+        if response.status_code == 404:
             print("Invalid city")
-            return
+            exit(1)
 
         encKey = getEncKey(response)
 
@@ -101,8 +101,15 @@ def main():
         data = decryptData(encData, encKey)
 
         print(data.split(b'\0')[0].decode('utf-8'))
-    except:
+    except requests.exceptions.ConnectionError:
+        print("Server not found")
         exit(1)
+    except:
+        print("Error")
+        exit(1)
+    
+    exit(0)
+        
 
 if __name__ == "__main__":
     main()
